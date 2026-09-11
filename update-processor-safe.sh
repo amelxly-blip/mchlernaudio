@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat << 'EOT' > services/audioProcessor.js
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 
@@ -42,3 +45,9 @@ class AudioProcessor {
 }
 
 module.exports = new AudioProcessor();
+EOT
+
+git add .
+git commit -m "Fix cross-platform FFmpeg path resolution for Railway and Termux"
+git push -u origin main --force
+echo "=== SELESAI DIPUSH KE GITHUB ==="
