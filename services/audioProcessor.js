@@ -8,6 +8,7 @@ function getFfmpegPath() {
   } catch (e) {}
   if (fs.existsSync('/usr/bin/ffmpeg')) return '/usr/bin/ffmpeg';
   if (fs.existsSync('/usr/local/bin/ffmpeg')) return '/usr/local/bin/ffmpeg';
+  if (fs.existsSync('/app/.apt/usr/bin/ffmpeg')) return '/app/.apt/usr/bin/ffmpeg';
   return 'ffmpeg';
 }
 
