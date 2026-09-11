@@ -1,3 +1,6 @@
+#!/bin/bash
+
+cat << 'EOT' > client/index.html
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -559,3 +562,9 @@
   </script>
 </body>
 </html>
+EOT
+
+git add .
+git commit -m "Fix JavaScript syntax error in menu switcher and slider values"
+git push -u origin main --force
+echo "=== PERBAIKAN MENU SELESAI DIPUSH ==="
