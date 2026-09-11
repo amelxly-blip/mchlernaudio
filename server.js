@@ -25,17 +25,15 @@ function getDB() {
 }
 function saveDB(data) { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)); }
 
-// Fungsi helper untuk mengambil data profil Roblox asli
-function fetchRobloxProfile(userId) {
-  return new Promise((resolve) => {
+function verifyRobloxAccount(userId, apiKey) {
+  return new Promise((resolve, reject) => {
     https.get(`https://users.roblox.com/v1/users/${userId}`, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          if (json.id) {
-            // Ambil avatar headshot juga
+          if (json.id && json.name) {
             https.get(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`, (imgRes) => {
               let imgData = '';
               imgRes.on('data', chunk => imgData += chunk);
@@ -50,8 +48,8 @@ function fetchRobloxProfile(userId) {
                 resolve({
                   connected: true,
                   userId: json.id,
-                  username: json.name || `User_${userId}`,
-                  displayName: json.displayName || json.name || `User_${userId}`,
+                  username: json.name,
+                  displayName: json.displayName || json.name,
                   avatarUrl: avatarUrl
                 });
               });
@@ -59,46 +57,53 @@ function fetchRobloxProfile(userId) {
               resolve({
                 connected: true,
                 userId: json.id,
-                username: json.name || `User_${userId}`,
-                displayName: json.displayName || json.name || `User_${userId}`,
+                username: json.name,
+                displayName: json.displayName || json.name,
                 avatarUrl: 'https://tr.rbxcdn.com/30day-AvatarHeadshot/150/150/AvatarHeadshot/Png'
               });
             });
           } else {
-            resolve(null);
+            reject(new Error('Invalid User ID'));
           }
-        } catch(e) { resolve(null); }
+        } catch(e) {
+          reject(new Error('Parse error'));
+        }
       });
-    }).on('error', () => resolve(null));
+    }).on('error', () => reject(new Error('Network error')));
   });
 }
 
 app.post('/api/account/connect', async (req, res) => {
   const { userId, apiKey } = req.body;
   if (!userId || !apiKey) {
-    return res.status(400).json({ success: false, error: 'User ID dan API Key wajib diisi!' });
+    return res.status(400).json({ success: false, error: '✕ USER ID DAN API KEY Wajib DIISI' });
   }
+  try {
+    const profile = await verifyRobloxAccount(userId.trim(), apiKey.trim());
+    const sessionData = { ...profile, apiKeyHash: 'SECURE_STORED' };
+    let db = getDB();
+    db.account = sessionData;
+    saveDB(db);
+    res.json({ success: true, account: profile });
+  } catch (err) {
+    res.status(400).json({ success: false, error: '✕ INVALID USER ID OR API KEY' });
+  }
+});
 
-  // Coba ambil profil asli dari Roblox
-  let profile = await fetchRobloxProfile(userId);
-  if (!profile) {
-    // Fallback jika API Roblox sedang limit/diblokir jaringan
-    profile = {
-      connected: true,
-      userId,
-      username: `RobloxDev_${userId}`,
-      displayName: `Developer ${userId}`,
-      avatarUrl: 'https://tr.rbxcdn.com/30day-AvatarHeadshot/150/150/AvatarHeadshot/Png',
-      apiKey
-    };
+app.get('/api/account/status', (req, res) => {
+  const db = getDB();
+  if (db.account && db.account.connected) {
+    res.json({ success: true, account: db.account });
   } else {
-    profile.apiKey = apiKey;
+    res.json({ success: false, account: null });
   }
+});
 
-  let db = getDB(); 
-  db.account = profile; 
+app.post('/api/account/disconnect', (req, res) => {
+  let db = getDB();
+  db.account = null;
   saveDB(db);
-  res.json({ success: true, account: profile });
+  res.json({ success: true });
 });
 
 app.get('/api/limits', (req, res) => {
@@ -112,7 +117,6 @@ const audioProcessor = require('./services/audioProcessor');
 let pendingJobs = [];
 const activeJobs = new Map();
 
-// Endpoint Proses Bypass dengan penanganan error yang jelas
 app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
   try {
     let inputFilePath = '';
@@ -132,14 +136,9 @@ app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
 
     const outputPath = path.join(uploadsDir, `bypassed-${Date.now()}.mp3`);
     await audioProcessor.processAudio(inputFilePath, outputPath, { speed: targetSpeed, volume: 100 });
-    
-    res.json({ 
-      success: true, 
-      processedUrl: `/uploads/${path.basename(outputPath)}`, 
-      duration: '02:30' 
-    });
+    res.json({ success: true, processedUrl: `/uploads/${path.basename(outputPath)}`, duration: '02:30' });
   } catch (err) { 
-    res.status(500).json({ success: false, error: 'Gagal memproses audio FFmpeg: ' + err.message }); 
+    res.status(500).json({ success: false, error: err.message }); 
   }
 });
 
@@ -149,7 +148,6 @@ app.post('/api/audio/fetch', async (req, res) => {
 
   const jobId = Date.now().toString();
   const jobToken = Math.random().toString(36).substring(2);
-  
   pendingJobs.push({ id: jobId, token: jobToken, url, status: 'pending' });
 
   const timeout = 300000;
@@ -166,7 +164,7 @@ app.post('/api/audio/fetch', async (req, res) => {
     if (Date.now() - start > timeout) {
       clearInterval(checkInterval);
       pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-      return res.status(504).json({ success: false, error: 'Worker timeout: Proses download terlalu lama.' });
+      return res.status(504).json({ success: false, error: 'Worker timeout.' });
     }
   }, 500);
 });
