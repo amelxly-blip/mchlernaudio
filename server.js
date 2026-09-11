@@ -37,28 +37,42 @@ app.get('/api/limits', (req, res) => {
 });
 
 const multer = require('multer');
-const upload = multer({ 
-  dest: 'uploads/',
-  limits: { fileSize: 50 * 1024 * 1024 } // Batas file 50MB
-});
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 50 * 1024 * 1024 } });
 const audioProcessor = require('./services/audioProcessor');
 
 let pendingJobs = [];
 const activeJobs = new Map();
 
+// Endpoint Proses Bypass (Mendukung File Upload Lokal ATAU fetchedUrl dari worker)
 app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
   try {
     let inputFilePath = '';
-    const { template } = req.body;
+    const { template, fetchedUrl } = req.body;
     let targetSpeed = parseFloat(template || 1.6);
-    if (req.file) inputFilePath = req.file.path;
-    if (!inputFilePath || !fs.existsSync(inputFilePath)) {
-      return res.status(400).json({ success: false, error: 'Pilih file audio lokal terlebih dahulu!' });
+
+    if (req.file) {
+      inputFilePath = req.file.path;
+    } else if (fetchedUrl) {
+      // Ambil file dari direktori uploads server berdasarkan path fetchedUrl
+      const cleanedPath = fetchedUrl.replace('/uploads/', '');
+      inputFilePath = path.join(uploadsDir, cleanedPath);
     }
+
+    if (!inputFilePath || !fs.existsSync(inputFilePath)) {
+      return res.status(400).json({ success: false, error: 'Silahkan fetch link YouTube/TikTok atau pilih file audio lokal terlebih dahulu!' });
+    }
+
     const outputPath = path.join(uploadsDir, `bypassed-${Date.now()}.mp3`);
     await audioProcessor.processAudio(inputFilePath, outputPath, { speed: targetSpeed, volume: 100 });
-    res.json({ success: true, processedUrl: `/uploads/${path.basename(outputPath)}`, duration: '02:30' });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+    
+    res.json({ 
+      success: true, 
+      processedUrl: `/uploads/${path.basename(outputPath)}`, 
+      duration: '02:30' 
+    });
+  } catch (err) { 
+    res.status(500).json({ success: false, error: err.message }); 
+  }
 });
 
 app.post('/api/audio/fetch', async (req, res) => {
@@ -70,7 +84,7 @@ app.post('/api/audio/fetch', async (req, res) => {
   
   pendingJobs.push({ id: jobId, token: jobToken, url, status: 'pending' });
 
-  const timeout = 300000; // 5 menit
+  const timeout = 300000;
   const start = Date.now();
 
   const checkInterval = setInterval(() => {
@@ -94,11 +108,7 @@ app.post('/api/fetch-worker/claim', (req, res) => {
   res.json({ job: pendingJobs.shift() });
 });
 
-const uploadWorker = multer({ 
-  dest: 'uploads/',
-  limits: { fileSize: 50 * 1024 * 1024 }
-});
-
+const uploadWorker = multer({ dest: 'uploads/', limits: { fileSize: 50 * 1024 * 1024 } });
 app.post('/api/fetch-worker/complete', uploadWorker.single('file'), (req, res) => {
   try {
     const { job_id, title, thumbnail, error } = req.body;
