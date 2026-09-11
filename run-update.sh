@@ -1,3 +1,7 @@
+#!/bin/bash
+mkdir -p client services storage routes uploads
+
+cat << 'EOF' > server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -128,3 +132,26 @@ app.post('/api/roblox/upload', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
+EOF
+
+cat << 'EOF' > services/audioProcessor.js
+const ffmpeg = require('fluent-ffmpeg');
+class AudioProcessor {
+  processAudio(inputPath, outputPath, options) {
+    return new Promise((resolve, reject) => {
+      let command = ffmpeg(inputPath);
+      let filters = [];
+      if (options.volume) filters.push(`volume=${parseFloat(options.volume) / 100}`);
+      if (options.speed) filters.push(`atempo=${options.speed}`);
+      if (filters.length > 0) command.audioFilters(filters);
+      command.toFormat('mp3').on('end', () => resolve(outputPath)).on('error', err => reject(err)).save(outputPath);
+    });
+  }
+}
+module.exports = new AudioProcessor();
+EOF
+
+git add .
+git commit -m "Update server with safe worker routing"
+git push -u origin main --force
+echo "=== SELESAI DAN BERHASIL DIPUSH ==="
