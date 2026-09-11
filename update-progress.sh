@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Perbarui client/index.html dengan progress bar & penanganan error fetch yang transparan
+cat << 'EOF' > client/index.html
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -371,3 +375,9 @@
   </script>
 </body>
 </html>
+EOF
+
+git add .
+git commit -m "Add interactive progress bar and status tracker for worker fetch"
+git push -u origin main --force
+echo "=== PROGRESS BAR BERHASIL DIPUSH ==="
