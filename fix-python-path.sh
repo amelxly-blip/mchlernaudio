@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Perbarui server.js dengan pendeteksian python path yang aman untuk railway
+cat << 'EOF' > server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -147,3 +151,16 @@ app.post('/api/roblox/upload', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
+EOF
+
+# Perbarui nixpacks.toml untuk memastikan python3 terinstal dengan benar
+cat << 'EOF' > nixpacks.toml
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "python3", "python3Packages.pip", "ffmpeg"]
+EOF
+
+# Push ke GitHub
+git add .
+git commit -m "Fix python execution path fallback for yt-dlp in Railway"
+git push -u origin main --force
+echo "=== SELESAI DAN DIPUSH KE GITHUB ==="
