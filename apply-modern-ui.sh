@@ -1,3 +1,5 @@
+#!/bin/bash
+cat << 'EOF' > client/index.html
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -384,3 +386,10 @@
   </script>
 </body>
 </html>
+EOF
+
+# Jalankan git push otomatis
+git add .
+git commit -m "Update Modern Glassmorphism UI with Back buttons & Fetch feature"
+git push -u origin main --force
+echo "=== UPDATE UI MODERN BERHASIL DIPUSH KE GITHUB! ==="
