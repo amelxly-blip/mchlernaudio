@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Perbarui client/index.html dengan logika bypass ganda (File Lokal atau Fetched URL)
+cat << 'EOF' > client/index.html
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -330,3 +334,16 @@
   </script>
 </body>
 </html>
+EOF
+
+# Update git-push script
+cat << 'EOF' > git-push.sh
+#!/bin/bash
+git add .
+git commit -m "Fix bypass flow support for both local files and fetched URLs"
+git push -u origin main --force
+EOF
+chmod +x git-push.sh
+
+# Jalankan push otomatis
+./git-push.sh
