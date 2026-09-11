@@ -1,3 +1,28 @@
+#!/bin/bash
+mkdir -p client services storage routes uploads
+
+# 1. Perbarui package.json menggunakan paket yang benar: youtube-dl-exec
+cat << 'EOF' > package.json
+{
+  "name": "mchlern-bypas-audio",
+  "version": "2.0.0",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.7.0",
+    "uuid": "^9.0.1",
+    "youtube-dl-exec": "^3.1.12"
+  }
+}
+EOF
+
+# 2. Update server.js menggunakan youtube-dl-exec
+cat << 'EOF' > server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -88,3 +113,34 @@ app.post('/api/roblox/upload', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
+EOF
+
+# 3. Buat services/audioProcessor.js
+cat << 'EOF' > services/audioProcessor.js
+const ffmpeg = require('fluent-ffmpeg');
+class AudioProcessor {
+  processAudio(inputPath, outputPath, options) {
+    return new Promise((resolve, reject) => {
+      let command = ffmpeg(inputPath);
+      let filters = [];
+      if (options.volume) filters.push(`volume=${parseFloat(options.volume) / 100}`);
+      if (options.speed) filters.push(`atempo=${options.speed}`);
+      if (filters.length > 0) command.audioFilters(filters);
+      command.toFormat('mp3').on('end', () => resolve(outputPath)).on('error', err => reject(err)).save(outputPath);
+    });
+  }
+}
+module.exports = new AudioProcessor();
+EOF
+
+# 4. Buat git-push.sh bersih
+cat << 'EOF' > git-push.sh
+#!/bin/bash
+git add .
+git commit -m "Fix: Use youtube-dl-exec package for robust fetching"
+git push -u origin main --force
+EOF
+chmod +x git-push.sh
+
+# 5. Jalankan push
+./git-push.sh
