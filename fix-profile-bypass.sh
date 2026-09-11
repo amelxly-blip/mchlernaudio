@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Perbarui server.js dengan integrasi API Roblox untuk mengambil profil asli & perbaikan bypass
+cat << 'EOF' > server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -210,3 +214,9 @@ app.post('/api/roblox/upload', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
+EOF
+
+git add .
+git commit -m "Add Roblox profile API integration and fix bypass error handling"
+git push -u origin main --force
+echo "=== SELESAI DIPUSH ==="
