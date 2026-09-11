@@ -62,6 +62,15 @@
     #progress-bar, #process-progress-bar { width: 0%; height: 8px; background: var(--accent); border-radius: 6px; transition: width 0.3s ease; }
     #progress-status, #process-progress-status { font-size: 12px; color: var(--muted); margin-top: 6px; font-weight: 600; }
 
+    .audio-player-card { background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 15px; display: none; }
+    .player-controls { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+    .play-btn { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); color: var(--bg); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; transition: 0.2s; flex-shrink: 0; }
+    .play-btn:hover { background: var(--accent-hover); transform: scale(1.05); }
+    .player-info { flex: 1; overflow: hidden; }
+    .player-title { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+    .player-timeline { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
+    .timeline-slider { flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; }
+
     .menu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-top: 20px; }
     .menu-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 14px; padding: 24px; cursor: pointer; transition: 0.3s; display: flex; flex-direction: column; gap: 12px; }
     .menu-card:hover { border-color: var(--accent); background: rgba(255,255,255,0.05); transform: translateY(-3px); }
@@ -101,7 +110,7 @@
       <i class="fa-solid fa-shield-halved" style="font-size: 24px; color: var(--muted);"></i>
     </div>
 
-    <!-- TAB HOME DASHBOARD -->
+    <!-- TAB HOME -->
     <div id="tab-home" class="section-view active">
       <div class="card">
         <h2><i class="fa-solid fa-compass"></i> Dashboard Utama</h2>
@@ -152,7 +161,7 @@
           <label>Fetch Audio dari Link YouTube / TikTok (Worker)</label>
           <div style="display: flex; gap: 10px;">
             <input type="text" id="fetch-url" placeholder="https://youtube.com/watch?v=...">
-            <button class="btn btn-outline" onclick="fetchMedia()"><i class="fa-solid fa-download"></i> Fetch</button>
+            <button class="btn btn-outline" onclick="fetchAudio()"><i class="fa-solid fa-download"></i> Fetch</button>
           </div>
           
           <div id="progress-container">
@@ -164,18 +173,29 @@
             <img id="fetch-thumb" style="width: 100px; height: 60px; object-fit: cover; border-radius: 6px;">
             <div style="flex:1;">
               <p id="fetch-title" style="font-weight: 700; font-size: 13px; margin-bottom: 4px;"></p>
-              <p id="fetch-duration" style="font-size: 11px; color: var(--success); font-weight: 700; margin-bottom: 2px;">Durasi: 03:00</p>
+              <p id="fetch-duration" style="font-size: 11px; color: var(--success); font-weight: 700; margin-bottom: 2px;">Durasi: 00:00</p>
               <p id="fetch-info" style="font-size: 11px; color: var(--muted);">YouTube/TikTok • Siap Preview & Upload</p>
             </div>
           </div>
         </div>
 
-        <div class="form-group" id="preview-player-container" style="display:none;">
-          <label>Preview Suara Audio (Sesuai Hasil Speed & Pitch Ingame)</label>
-          <audio id="audio-preview-player" controls style="width:100%; margin-bottom:10px;"></audio>
+        <!-- AUDIO PREVIEW PLAYER CARD -->
+        <div id="audio-player-card" class="audio-player-card">
+          <div class="player-controls">
+            <button class="play-btn" id="play-pause-btn" onclick="togglePlayAudio()"><i class="fa-solid fa-play" id="play-icon"></i></button>
+            <div class="player-info">
+              <div class="player-title" id="player-title-text">Audio Preview</div>
+              <div class="player-timeline">
+                <span id="current-time">00:00</span>
+                <input type="range" id="timeline-slider" class="timeline-slider" value="0" min="0" max="100" oninput="seekAudio(this.value)">
+                <span id="total-duration">00:00</span>
+              </div>
+            </div>
+          </div>
+          <audio id="main-audio-element" style="display:none;"></audio>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" style="margin-top: 20px;">
           <label>Pilih Template Bypas Cepat (Speed + Pitch)</label>
           <div class="templates-grid">
             <div class="template-badge active" onclick="setTemplate('1.6', '0.9', this)">1.6x</div>
@@ -214,7 +234,7 @@
 
         <div style="display: flex; gap: 12px; margin-top: 25px;">
           <button class="btn" id="upload-roblox-btn" onclick="processAndUploadToRoblox()"><i class="fa-solid fa-cloud-arrow-up"></i> UPLOAD TO ROBLOX</button>
-          <button class="btn btn-outline" onclick="resetSettings()"><i class="fa-solid fa-rotate-right"></i> Reset</button>
+          <button class="btn btn-outline" onclick="resetAudio()"><i class="fa-solid fa-rotate-right"></i> Reset</button>
         </div>
       </div>
     </div>
@@ -265,8 +285,8 @@
         </div>
         <ol style="padding-left: 20px; color: var(--muted); font-size: 14px; line-height: 1.8;">
           <li>Koneksikan akun Roblox Anda.</li>
-          <li>Masukkan URL YouTube/TikTok, klik <strong>Fetch</strong> untuk melihat durasi, judul, dan thumbnail asli.</li>
-          <li>Atur speed, pitch, dan volume secara manual atau pakai template cepat, lalu klik <strong>UPLOAD TO ROBLOX</strong>!</li>
+          <li>Masukkan URL YouTube/TikTok, klik <strong>Fetch</strong> untuk memuat playable audio.</li>
+          <li>Gunakan custom player untuk play/pause, atur speed & pitch, lalu klik <strong>UPLOAD TO ROBLOX</strong>!</li>
         </ol>
       </div>
     </div>
@@ -280,6 +300,8 @@
     let currentSpeed = 1.6;
     let currentPitch = 0.9;
     let currentVolume = 100;
+
+    const audioElement = document.getElementById('main-audio-element');
 
     function switchTab(id, e) {
       document.querySelectorAll('.section-view').forEach(v => v.classList.remove('active'));
@@ -302,21 +324,18 @@
       setTimeout(() => t.style.display = 'none', 3500);
     }
 
-    // Persistent login menggunakan localStorage agar tidak perlu login ulang saat deploy
-    window.addEventListener('DOMContentLoaded', async () => {
-      const savedAccount = localStorage.getItem('mchlern_rbx_account');
-      if (savedAccount) {
-        try {
-          renderProfile(JSON.parse(savedAccount));
-          return;
-        } catch(e) {}
-      }
+    function formatTime(secs) {
+      if (isNaN(secs) || secs < 0) return '00:00';
+      const mins = Math.floor(secs / 60);
+      const remainingSecs = Math.floor(secs % 60);
+      return `${mins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
+    }
 
+    window.addEventListener('DOMContentLoaded', async () => {
       try {
         const res = await fetch('/api/account/status');
         const data = await res.json();
         if(data.success && data.account) {
-          localStorage.setItem('mchlern_rbx_account', JSON.stringify(data.account));
           renderProfile(data.account);
         }
       } catch(e) {}
@@ -340,7 +359,6 @@
         const data = await res.json();
         if(data.success) {
           showToast('✓ ROBLOX ACCOUNT CONNECTED');
-          localStorage.setItem('mchlern_rbx_account', JSON.stringify(data.account));
           renderProfile(data.account);
         } else {
           showToast(data.error || '✕ INVALID USER ID OR API KEY');
@@ -370,8 +388,6 @@
 
     async function disconnectAccount() {
       try { await fetch('/api/account/disconnect', { method: 'POST' }); } catch(e) {}
-      localStorage.removeItem('mchlern_rbx_account');
-
       document.getElementById('profile-view').style.display = 'none';
       document.getElementById('form-view').style.display = 'block';
       document.getElementById('rbx-userid').value = '';
@@ -400,7 +416,7 @@
       document.getElementById('pitch-val').innerText = currentPitch.toFixed(2);
 
       showToast(`Template Speed ${currentSpeed}x & Pitch ${currentPitch} Dipilih`);
-      if (fetchedAudioUrl) await updateAudioPreview();
+      if (fetchedAudioUrl) await processAndLoadAudio();
     }
 
     function updateManualSettings() {
@@ -412,45 +428,24 @@
       document.getElementById('pitch-val').innerText = currentPitch.toFixed(2);
       document.getElementById('vol-val').innerText = currentVolume + '%';
 
+      audioElement.volume = currentVolume / 100;
+      audioElement.playbackRate = currentSpeed;
+
       updateDynamicDuration();
-      if (fetchedAudioUrl) updateAudioPreview();
     }
 
     function updateDynamicDuration() {
       const adjustedSeconds = Math.round(baseDurationSeconds / currentSpeed);
-      const mins = Math.floor(adjustedSeconds / 60);
-      const secs = adjustedSeconds % 60;
-      const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      const formatted = formatTime(adjustedSeconds);
       document.getElementById('fetch-duration').innerText = `Durasi (Bypassed): ${formatted} (${currentSpeed}x Speed)`;
+      document.getElementById('total-duration').innerText = formatted;
     }
 
-    function resetSettings() {
-      currentSpeed = 1.6;
-      currentPitch = 0.9;
-      currentVolume = 100;
-      fetchedAudioUrl = '';
-
-      document.getElementById('slider-speed').value = 1.6;
-      document.getElementById('speed-val').innerText = '1.6x';
-      document.getElementById('slider-pitch').value = 0.9;
-      document.getElementById('pitch-val').innerText = '0.90';
-      document.getElementById('slider-vol').value = 100;
-      document.getElementById('vol-val').innerText = '100%';
-
-      document.getElementById('fetch-url').value = '';
-      document.getElementById('fetch-preview').style.display = 'none';
-      document.getElementById('preview-player-container').style.display = 'none';
-      document.getElementById('progress-container').style.display = 'none';
-      document.getElementById('progress-status').innerText = '';
-      document.getElementById('process-progress-container').style.display = 'none';
-      document.getElementById('process-progress-status').innerText = '';
-      showToast('Pengaturan di-reset!');
-    }
-
-    async function fetchMedia() {
+    async function fetchAudio() {
       const url = document.getElementById('fetch-url').value;
       if(!url) return showToast('Masukkan URL YouTube atau TikTok terlebih dahulu!');
       
+      console.log('[FETCH] Requesting URL:', url);
       const progContainer = document.getElementById('progress-container');
       const progressBar = document.getElementById('progress-bar');
       const progStatus = document.getElementById('progress-status');
@@ -468,38 +463,44 @@
           headers: {'Content-Type': 'application/json'}, 
           body: JSON.stringify({url}) 
         });
+        
+        console.log('[FETCH RESPONSE] Status:', res.status);
         const data = await res.json();
         
-        if(data.success) {
+        if(data.success && data.metadata && data.metadata.audioUrl) {
           progressBar.style.width = '100%';
           progStatus.innerText = 'Fetch Berhasil!';
-          fetchedAudioUrl = data.metadata.downloadUrl;
+          fetchedAudioUrl = data.metadata.audioUrl;
+          baseDurationSeconds = data.metadata.duration || 180;
           
+          console.log('[AUDIO URL]:', fetchedAudioUrl);
+          console.log('[AUDIO MIME]:', data.metadata.mimeType || 'audio/mpeg');
+
           const prev = document.getElementById('fetch-preview');
           prev.style.display = 'flex';
           document.getElementById('fetch-thumb').src = data.metadata.thumbnail;
           document.getElementById('fetch-title').innerText = data.metadata.title;
+          document.getElementById('player-title-text').innerText = data.metadata.title;
           
           updateDynamicDuration();
+          showToast('Fetch Berhasil! Memproses audio preview...');
           
-          showToast('Fetch Berhasil! Memproses preview...');
-          await updateAudioPreview();
+          await processAndLoadAudio();
         } else {
-          progressBar.style.width = '100%';
-          progressBar.style.background = 'var(--danger)';
-          progStatus.innerText = 'Gagal: ' + (data.error || 'Cek worker Termux!');
-          showToast('Gagal fetch audio.');
+          throw new Error(data.error || 'Audio source tidak ditemukan');
         }
       } catch (err) {
+        console.error('[FETCH ERROR]', err);
         progressBar.style.width = '100%';
         progressBar.style.background = 'var(--danger)';
-        progStatus.innerText = 'Error jaringan.';
-        showToast('Terjadi kesalahan jaringan.');
+        progStatus.innerText = 'Gagal: ' + err.message;
+        showToast('Gagal fetch: ' + err.message);
       }
     }
 
-    async function updateAudioPreview() {
+    async function processAndLoadAudio() {
       if (!fetchedAudioUrl) return;
+
       const fd = new FormData();
       fd.append('speed', currentSpeed);
       fd.append('pitch', currentPitch);
@@ -507,15 +508,109 @@
       fd.append('fetchedUrl', fetchedAudioUrl);
 
       try {
+        console.log('[AUDIO LOAD] Memproses audio ke backend /api/audio/process...');
         const res = await fetch('/api/audio/process', { method: 'POST', body: fd });
         const data = await res.json();
-        if(data.success) {
-          document.getElementById('preview-player-container').style.display = 'block';
-          const player = document.getElementById('audio-preview-player');
-          player.src = data.processedUrl;
-          player.load();
+
+        if (!res.ok || !data.success || !data.audioUrl) {
+          throw new Error(data.error || 'Gagal membuat audio preview');
         }
-      } catch(e) {}
+
+        fetchedAudioUrl = data.audioUrl;
+        const audioUrl = new URL(data.audioUrl, window.location.origin).href;
+
+        audioElement.src = audioUrl;
+        audioElement.preload = 'metadata';
+        audioElement.volume = currentVolume / 100;
+        audioElement.playbackRate = currentSpeed;
+        audioElement.load();
+
+        console.log('[AUDIO URL READY]:', audioUrl);
+      } catch(err) {
+        console.error('[AUDIO ERROR]', err);
+        showToast('Audio error: ' + err.message);
+      }
+    }
+
+    function togglePlayAudio() {
+      if (!audioElement.src) return showToast('Audio source belum tersedia');
+      const icon = document.getElementById('play-icon');
+      
+      if (audioElement.paused) {
+        audioElement.play().then(() => {
+          icon.className = 'fa-solid fa-pause';
+          console.log('[AUDIO CANPLAY] Playing audio...');
+        }).catch(err => {
+          console.error('[AUDIO ERROR] Play failed:', err);
+          showToast('Browser gagal memutar audio');
+        });
+      } else {
+        audioElement.pause();
+        icon.className = 'fa-solid fa-play';
+      }
+    }
+
+    audioElement.addEventListener('loadedmetadata', () => {
+      console.log('Audio metadata loaded duration:', audioElement.duration);
+      document.getElementById('total-duration').innerText = formatTime(audioElement.duration);
+      document.getElementById('audio-player-card').style.display = 'block';
+    });
+
+    audioElement.addEventListener('canplay', () => {
+      console.log('Audio can play successfully');
+    });
+
+    audioElement.addEventListener('error', (e) => {
+      console.error('Audio playback error:', audioElement.error, audioElement.src);
+      showToast('File audio tidak playable. Cek output MP3/server.');
+    });
+
+    audioElement.addEventListener('timeupdate', () => {
+      if (!audioElement.duration) return;
+      const progressPercent = (audioElement.currentTime / audioElement.duration) * 100;
+      document.getElementById('timeline-slider').value = progressPercent;
+      document.getElementById('current-time').innerText = formatTime(audioElement.currentTime);
+    });
+
+    audioElement.addEventListener('ended', () => {
+      document.getElementById('play-icon').className = 'fa-solid fa-play';
+      document.getElementById('timeline-slider').value = 0;
+    });
+
+    function seekAudio(val) {
+      if (!audioElement.duration) return;
+      const targetTime = (val / 100) * audioElement.duration;
+      audioElement.currentTime = targetTime;
+    }
+
+    function resetAudio() {
+      audioElement.pause();
+      audioElement.src = '';
+      document.getElementById('audio-player-card').style.display = 'none';
+      document.getElementById('play-icon').className = 'fa-solid fa-play';
+      resetSettings();
+    }
+
+    function resetSettings() {
+      currentSpeed = 1.6;
+      currentPitch = 0.9;
+      currentVolume = 100;
+      fetchedAudioUrl = '';
+
+      document.getElementById('slider-speed').value = 1.6;
+      document.getElementById('speed-val').innerText = '1.6x';
+      document.getElementById('slider-pitch').value = 0.9;
+      document.getElementById('pitch-val').innerText = '0.90';
+      document.getElementById('slider-vol').value = 100;
+      document.getElementById('vol-val').innerText = '100%';
+
+      document.getElementById('fetch-url').value = '';
+      document.getElementById('fetch-preview').style.display = 'none';
+      document.getElementById('progress-container').style.display = 'none';
+      document.getElementById('progress-status').innerText = '';
+      document.getElementById('process-progress-container').style.display = 'none';
+      document.getElementById('process-progress-status').innerText = '';
+      showToast('Pengaturan di-reset!');
     }
 
     async function processAndUploadToRoblox() {
@@ -531,7 +626,7 @@
       container.style.display = 'block';
       bar.style.width = '30%';
       bar.style.background = 'var(--accent)';
-      status.innerText = 'Processing Audio (Speed & Pitch)... 30%';
+      status.innerText = 'Processing Audio & Uploading to Roblox... 30%';
       btn.disabled = true;
 
       const fd = new FormData(); 
@@ -547,23 +642,23 @@
         if(!dataProc.success) throw new Error(dataProc.error || 'Gagal memproses audio');
 
         bar.style.width = '70%';
-        status.innerText = 'Uploading to Roblox Cloud... 70%';
+        status.innerText = 'Mengirim ke Roblox Open Cloud Assets API... 70%';
 
         const titleTrack = document.getElementById('fetch-title').innerText || 'MCHLERN Track';
         const resUpload = await fetch('/api/roblox/upload', { 
           method: 'POST', 
           headers: {'Content-Type': 'application/json'}, 
-          body: JSON.stringify({ title: titleTrack, audioUrl: dataProc.processedUrl }) 
+          body: JSON.stringify({ title: titleTrack, audioUrl: dataProc.audioUrl }) 
         });
         const dataUpload = await resUpload.json();
 
         if(dataUpload.success) {
           bar.style.width = '100%';
           bar.style.background = 'var(--success)';
-          status.innerText = `✓ Success! Asset ID: ${dataUpload.assetId}`;
-          showToast('Berhasil Upload ke Roblox! Asset ID: ' + dataUpload.assetId);
+          status.innerText = `✓ Success! Asset ID/Operation: ${dataUpload.assetId}`;
+          showToast('Berhasil Upload ke Roblox! ID: ' + dataUpload.assetId);
         } else {
-          throw new Error('Gagal upload ke Roblox Open Cloud');
+          throw new Error(dataUpload.error || 'Gagal upload ke Roblox Open Cloud');
         }
       } catch (err) {
         bar.style.width = '100%';

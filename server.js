@@ -16,7 +16,14 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'client')));
-app.use('/uploads', express.static(uploadsDir));
+app.use('/uploads', express.static(uploadsDir, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.mp3')) {
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Accept-Ranges', 'bytes');
+    }
+  }
+}));
 
 const dbPath = path.join(storageDir, 'db.json');
 function getDB() {
@@ -45,26 +52,12 @@ function verifyRobloxAccount(userId, apiKey) {
                     avatarUrl = imgJson.data[0].imageUrl;
                   }
                 } catch(e) {}
-                resolve({
-                  connected: true,
-                  userId: json.id,
-                  username: json.name,
-                  displayName: json.displayName || json.name,
-                  avatarUrl: avatarUrl
-                });
+                resolve({ connected: true, userId: json.id, username: json.name, displayName: json.displayName || json.name, avatarUrl });
               });
             }).on('error', () => {
-              resolve({
-                connected: true,
-                userId: json.id,
-                username: json.name,
-                displayName: json.displayName || json.name,
-                avatarUrl: 'https://tr.rbxcdn.com/30day-AvatarHeadshot/150/150/AvatarHeadshot/Png'
-              });
+              resolve({ connected: true, userId: json.id, username: json.name, displayName: json.displayName || json.name, avatarUrl: 'https://tr.rbxcdn.com/30day-AvatarHeadshot/150/150/AvatarHeadshot/Png' });
             });
-          } else {
-            reject(new Error('Invalid User ID'));
-          }
+          } else { reject(new Error('Invalid User ID')); }
         } catch(e) { reject(new Error('Parse error')); }
       });
     }).on('error', () => reject(new Error('Network error')));
@@ -79,7 +72,7 @@ app.post('/api/account/connect', async (req, res) => {
     let db = getDB();
     db.account = { ...profile, apiKey };
     saveDB(db);
-    res.json({ success: true, account: profile });
+    res.json({ success: true, account: { userId: profile.userId, username: profile.username, displayName: profile.displayName, avatarUrl: profile.avatarUrl } });
   } catch (err) {
     res.status(400).json({ success: false, error: '✕ INVALID USER ID OR API KEY' });
   }
@@ -88,7 +81,7 @@ app.post('/api/account/connect', async (req, res) => {
 app.get('/api/account/status', (req, res) => {
   const db = getDB();
   if (db.account && db.account.connected) {
-    res.json({ success: true, account: db.account });
+    res.json({ success: true, account: { userId: db.account.userId, username: db.account.username, displayName: db.account.displayName, avatarUrl: db.account.avatarUrl } });
   } else {
     res.json({ success: false, account: null });
   }
@@ -108,7 +101,21 @@ const audioProcessor = require('./services/audioProcessor');
 let pendingJobs = [];
 const activeJobs = new Map();
 
-// Endpoint Proses Audio / Preview Bypass
+function resolveInputFilePath(fetchedUrl) {
+  if (!fetchedUrl) return null;
+  let filename = fetchedUrl;
+  if (fetchedUrl.startsWith('http://') || fetchedUrl.startsWith('https://')) {
+    try {
+      const parsed = new URL(fetchedUrl);
+      filename = parsed.pathname;
+    } catch(e) {}
+  }
+  filename = filename.replace('/uploads/', '').replace(/^\/+/, '');
+  const resolved = path.join(uploadsDir, path.basename(filename));
+  if (fs.existsSync(resolved)) return resolved;
+  return null;
+}
+
 app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
   try {
     let inputFilePath = '';
@@ -117,22 +124,26 @@ app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
     if (req.file) {
       inputFilePath = req.file.path;
     } else if (fetchedUrl) {
-      const cleanedPath = fetchedUrl.replace('/uploads/', '').replace(/^\/+/, '');
-      inputFilePath = path.join(uploadsDir, cleanedPath);
+      inputFilePath = resolveInputFilePath(fetchedUrl);
     }
 
     if (!inputFilePath || !fs.existsSync(inputFilePath)) {
-      return res.status(400).json({ success: false, error: 'File audio sumber tidak ditemukan. Silahkan fetch ulang!' });
+      return res.status(400).json({ success: false, error: 'Audio source tidak ditemukan di server. Silahkan fetch ulang!' });
     }
 
-    const outputPath = path.join(uploadsDir, `bypassed-${Date.now()}.mp3`);
-    await audioProcessor.processAudio(inputFilePath, outputPath, { 
-      speed: speed || 1.6, 
-      pitch: pitch || 0.9, 
-      volume: volume || 100 
-    });
+    const outputPath = path.join(uploadsDir, `processed-${Date.now()}.mp3`);
+    await audioProcessor.processAudio(inputFilePath, outputPath, { speed, pitch, volume });
     
-    res.json({ success: true, processedUrl: `/uploads/${path.basename(outputPath)}` });
+    if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
+      return res.status(500).json({ success: false, error: 'Output audio gagal dibuat atau kosong' });
+    }
+
+    res.json({ 
+      success: true, 
+      audioUrl: `/uploads/${path.basename(outputPath)}`,
+      format: 'mp3',
+      mimeType: 'audio/mpeg'
+    });
   } catch (err) { 
     res.status(500).json({ success: false, error: err.message }); 
   }
@@ -185,9 +196,11 @@ app.post('/api/fetch-worker/complete', uploadWorker.single('file'), (req, res) =
         metadata: {
           title: title || 'MCHLERN Track',
           thumbnail: thumbnail || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300',
-          duration: '03:00',
+          duration: 113,
           sourcePlatform: 'YouTube/TikTok',
-          downloadUrl: audioUrl
+          audioUrl: audioUrl,
+          format: 'mp3',
+          mimeType: 'audio/mpeg'
         }
       });
     }
@@ -196,9 +209,77 @@ app.post('/api/fetch-worker/complete', uploadWorker.single('file'), (req, res) =
 });
 
 app.post('/api/roblox/upload', async (req, res) => {
-  const { title } = req.body;
-  await new Promise(r => setTimeout(r, 1500));
-  res.json({ success: true, assetId: Math.floor(1000000000 + Math.random() * 9000000000).toString() });
+  const { title, audioUrl } = req.body;
+  const db = getDB();
+  
+  if (!db.account || !db.account.apiKey) {
+    return res.status(401).json({ success: false, error: 'Akun Roblox belum terkoneksi atau API Key tidak ditemukan.' });
+  }
+
+  const resolvedAudioPath = resolveInputFilePath(audioUrl);
+  if (!resolvedAudioPath || !fs.existsSync(resolvedAudioPath)) {
+    return res.status(400).json({ success: false, error: 'File audio untuk diupload tidak ditemukan.' });
+  }
+
+  try {
+    const fileBuffer = fs.readFileSync(resolvedAudioPath);
+    const boundary = '----RobloxOpenCloudBoundary' + Math.random().toString(36).substring(2);
+    
+    const requestMetadata = JSON.stringify({
+      assetType: 'Audio',
+      displayName: title || 'MCHLERN Audio Track',
+      description: 'Uploaded via MCHLERN Engineering Bypass Engine',
+      creationContext: {
+        creator: { userId: db.account.userId.toString() }
+      }
+    });
+
+    let postData = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name=\"request\";\r\nContent-Type: application/json\r\n\r\n${requestMetadata}\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.mp3\"\r\nContent-Type: audio/mpeg\r\n\r\n`),
+      fileBuffer,
+      Buffer.from(`\r\n--${boundary}--\r\n`)
+    ]);
+
+    const options = {
+      hostname: 'apis.roblox.com',
+      path: '/assets/v1/assets',
+      method: 'POST',
+      headers: {
+        'x-api-key': db.account.apiKey,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': postData.length
+      }
+    };
+
+    const robloxReq = https.request(options, (robloxRes) => {
+      let responseBody = '';
+      robloxRes.on('data', chunk => responseBody += chunk);
+      robloxRes.on('end', () => {
+        try {
+          const jsonResp = JSON.parse(responseBody);
+          if (robloxRes.statusCode >= 200 && robloxRes.statusCode < 300) {
+            const operationId = jsonResp.operationId || jsonResp.path || 'Completed';
+            res.json({ success: true, assetId: operationId, message: 'Upload berhasil dikirim ke Roblox Open Cloud' });
+          } else {
+            res.status(400).json({ success: false, error: jsonResp.message || 'Gagal upload ke Roblox Open Cloud API' });
+          }
+        } catch(e) {
+          res.status(500).json({ success: false, error: 'Gagal memparsing response dari Roblox' });
+        }
+      });
+    });
+
+    robloxReq.on('error', (err) => {
+      res.status(500).json({ success: false, error: 'Koneksi ke Roblox API gagal: ' + err.message });
+    });
+
+    robloxReq.write(postData);
+    robloxReq.end();
+
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Error internal saat mengupload: ' + err.message });
+  }
 });
 
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
