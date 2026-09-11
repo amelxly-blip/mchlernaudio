@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Update server.js dengan logika download audio asli dari YouTube/TikTok
+cat << 'EOF' > server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -126,3 +130,36 @@ app.post('/api/roblox/upload', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
+EOF
+
+# Update package.json agar memastikan youtube-dl-exec terpasang
+cat << 'EOF' > package.json
+{
+  "name": "mchlern-bypas-audio",
+  "version": "2.0.0",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.7.0",
+    "uuid": "^9.0.1",
+    "youtube-dl-exec": "^3.1.12"
+  }
+}
+EOF
+
+# Update Aptfile agar Railway menginstal python & ffmpeg untuk youtubedl
+cat << 'EOF' > Aptfile
+ffmpeg
+python3
+EOF
+
+# Push otomatis ke GitHub
+git add .
+git commit -m "Fix: Enable direct server-side audio downloading for fetched YouTube/TikTok URLs"
+git push -u origin main --force
+echo "=== UPDATE SELESAI DAN DIPUSH KE GITHUB ==="
