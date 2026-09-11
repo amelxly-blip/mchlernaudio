@@ -65,9 +65,7 @@ function verifyRobloxAccount(userId, apiKey) {
           } else {
             reject(new Error('Invalid User ID'));
           }
-        } catch(e) {
-          reject(new Error('Parse error'));
-        }
+        } catch(e) { reject(new Error('Parse error')); }
       });
     }).on('error', () => reject(new Error('Network error')));
   });
@@ -75,14 +73,11 @@ function verifyRobloxAccount(userId, apiKey) {
 
 app.post('/api/account/connect', async (req, res) => {
   const { userId, apiKey } = req.body;
-  if (!userId || !apiKey) {
-    return res.status(400).json({ success: false, error: '✕ USER ID DAN API KEY Wajib DIISI' });
-  }
+  if (!userId || !apiKey) return res.status(400).json({ success: false, error: 'User ID & API Key wajib diisi!' });
   try {
     const profile = await verifyRobloxAccount(userId.trim(), apiKey.trim());
-    const sessionData = { ...profile, apiKeyHash: 'SECURE_STORED' };
     let db = getDB();
-    db.account = sessionData;
+    db.account = { ...profile, apiKey };
     saveDB(db);
     res.json({ success: true, account: profile });
   } catch (err) {
@@ -106,10 +101,6 @@ app.post('/api/account/disconnect', (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/limits', (req, res) => {
-  res.json({ success: true, limits: { dailyQuota: 100, usedToday: 2, remaining: 98, resetTime: '24 Hours' } });
-});
-
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 50 * 1024 * 1024 } });
 const audioProcessor = require('./services/audioProcessor');
@@ -117,16 +108,16 @@ const audioProcessor = require('./services/audioProcessor');
 let pendingJobs = [];
 const activeJobs = new Map();
 
+// Endpoint Proses Audio / Preview Bypass
 app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
   try {
     let inputFilePath = '';
-    const { template, fetchedUrl } = req.body;
-    let targetSpeed = parseFloat(template || 1.6);
+    const { fetchedUrl, speed, pitch, volume } = req.body;
 
     if (req.file) {
       inputFilePath = req.file.path;
     } else if (fetchedUrl) {
-      const cleanedPath = fetchedUrl.replace('/uploads/', '');
+      const cleanedPath = fetchedUrl.replace('/uploads/', '').replace(/^\/+/, '');
       inputFilePath = path.join(uploadsDir, cleanedPath);
     }
 
@@ -135,8 +126,13 @@ app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
     }
 
     const outputPath = path.join(uploadsDir, `bypassed-${Date.now()}.mp3`);
-    await audioProcessor.processAudio(inputFilePath, outputPath, { speed: targetSpeed, volume: 100 });
-    res.json({ success: true, processedUrl: `/uploads/${path.basename(outputPath)}`, duration: '02:30' });
+    await audioProcessor.processAudio(inputFilePath, outputPath, { 
+      speed: speed || 1.6, 
+      pitch: pitch || 0.9, 
+      volume: volume || 100 
+    });
+    
+    res.json({ success: true, processedUrl: `/uploads/${path.basename(outputPath)}` });
   } catch (err) { 
     res.status(500).json({ success: false, error: err.message }); 
   }
@@ -196,9 +192,7 @@ app.post('/api/fetch-worker/complete', uploadWorker.single('file'), (req, res) =
       });
     }
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 app.post('/api/roblox/upload', async (req, res) => {
