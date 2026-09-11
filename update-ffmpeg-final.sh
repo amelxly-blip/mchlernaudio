@@ -1,3 +1,63 @@
+#!/bin/bash
+
+# 1. Buat file Aptfile untuk Railway agar otomatis menginstal ffmpeg di cloud container
+echo "ffmpeg" > Aptfile
+
+# 2. Instal ffmpeg-static agar node.js memiliki akses binari lokal yang aman
+npm install ffmpeg-static
+
+# 3. Perbarui audioProcessor.js agar menggunakan ffmpeg-static dengan jalur yang benar
+cat << 'EOT' > services/audioProcessor.js
+const ffmpeg = require('fluent-ffmpeg');
+const fs = require('fs');
+
+function getFfmpegPath() {
+  try {
+    const ffmpegStatic = require('ffmpeg-static');
+    if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
+      return ffmpegStatic;
+    }
+  } catch (e) {}
+
+  if (fs.existsSync('/usr/bin/ffmpeg')) return '/usr/bin/ffmpeg';
+  if (fs.existsSync('/usr/local/bin/ffmpeg')) return '/usr/local/bin/ffmpeg';
+  
+  return 'ffmpeg';
+}
+
+const resolvedPath = getFfmpegPath();
+ffmpeg.setFfmpegPath(resolvedPath);
+console.log("FFmpeg detected ✓ Path:", resolvedPath);
+
+class AudioProcessor {
+  processAudio(inputPath, outputPath, options) {
+    return new Promise((resolve, reject) => {
+      let command = ffmpeg(inputPath);
+      let filters = [];
+      
+      if (options.volume) filters.push(`volume=${parseFloat(options.volume) / 100}`);
+      if (options.speed) filters.push(`atempo=${options.speed}`);
+      
+      if (filters.length > 0) {
+        command.audioFilters(filters);
+      }
+
+      command
+        .toFormat('mp3')
+        .on('end', () => resolve(outputPath))
+        .on('error', (err) => reject(new Error("Gagal memproses audio FFmpeg: " + err.message)))
+        .save(outputPath);
+    });
+  }
+}
+
+module.exports = new AudioProcessor();
+EOT
+
+# 4. Perbarui client/index.html sesuai permintaan Anda:
+# - Menghapus tombol "Proses Bypas" terpisah dan langsung mengganti alurnya menjadi tombol "UPLOAD TO ROBLOX" setelah fetch & preview selesai.
+# - Menambahkan panduan teks kecepatan ingame Roblox (misal: "Ingame Pitch Normal: Gunakan 1.6x atau 2.3x agar suara tidak melengking").
+cat << 'EOT' > client/index.html
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -398,3 +458,9 @@
   </script>
 </body>
 </html>
+EOT
+
+git add .
+git commit -m "Integrate Aptfile, fix FFmpeg path, and update UI workflow to direct Upload to Roblox with Speed info"
+git push -u origin main --force
+echo "=== PEMBARUAN SELESAI DIPUSH KE GITHUB ==="

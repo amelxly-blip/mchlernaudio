@@ -10,7 +10,7 @@ function getFfmpegPath() {
   } catch (e) {}
 
   if (fs.existsSync('/usr/bin/ffmpeg')) return '/usr/bin/ffmpeg';
-  if (fs.existsSync('/data/data/com.termux/files/usr/bin/ffmpeg')) return '/data/data/com.termux/files/usr/bin/ffmpeg';
+  if (fs.existsSync('/usr/local/bin/ffmpeg')) return '/usr/local/bin/ffmpeg';
   
   return 'ffmpeg';
 }
