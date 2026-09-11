@@ -6,9 +6,23 @@ function getFfmpegPath() {
     const ffmpegStatic = require('ffmpeg-static');
     if (ffmpegStatic && fs.existsSync(ffmpegStatic)) return ffmpegStatic;
   } catch (e) {}
-  if (fs.existsSync('/usr/bin/ffmpeg')) return '/usr/bin/ffmpeg';
-  if (fs.existsSync('/usr/local/bin/ffmpeg')) return '/usr/local/bin/ffmpeg';
-  if (fs.existsSync('/app/.apt/usr/bin/ffmpeg')) return '/app/.apt/usr/bin/ffmpeg';
+
+  // Daftar path umum binary ffmpeg di lingkungan Linux / Cloud / Railway / Termux
+  const possiblePaths = [
+    '/usr/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+    '/app/.apt/usr/bin/ffmpeg',
+    '/data/data/com.termux/files/usr/bin/ffmpeg'
+  ];
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      console.log('[FFMPEG] Ditemukan di path:', p);
+      return p;
+    }
+  }
+  
+  console.log('[FFMPEG] Menggunakan fallback default command: ffmpeg');
   return 'ffmpeg';
 }
 
