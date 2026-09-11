@@ -19,18 +19,20 @@ class AudioProcessor {
       let command = ffmpeg(inputPath);
       let filters = [];
 
-      let speed = parseFloat(options.speed || 1.6);
-      let pitch = parseFloat(options.pitch || 1.0);
-      let volume = parseFloat(options.volume || 100);
+      let speed = Number(options.speed);
+      let pitch = Number(options.pitch);
+      let volume = Number(options.volume);
 
-      // Filter volume
-      if (volume !== 100) {
-        filters.push(`volume=${volume / 100}`);
+      const safeSpeed = Number.isFinite(speed) ? speed : 1.6;
+      const safePitch = Number.isFinite(pitch) ? pitch : 0.9;
+      const safeVolume = Number.isFinite(volume) ? volume : 100;
+
+      if (safeVolume !== 100) {
+        filters.push(`volume=${safeVolume / 100}`);
       }
 
-      // Filter atempo untuk speed (bisa dirangkai jika > 2.0)
-      if (speed !== 1.0) {
-        let s = speed;
+      if (safeSpeed !== 1.0) {
+        let s = safeSpeed;
         while (s > 2.0) {
           filters.push('atempo=2.0');
           s /= 2.0;
@@ -40,9 +42,8 @@ class AudioProcessor {
         }
       }
 
-      // Filter pitch menggunakan aset / rubberband jika ada, atauasetrate
-      if (pitch !== 1.0) {
-        filters.push(`asetrate=44100*${pitch},aresample=44100`);
+      if (safePitch !== 1.0) {
+        filters.push(`asetrate=44100*${safePitch},aresample=44100`);
       }
 
       if (filters.length > 0) {
@@ -51,8 +52,18 @@ class AudioProcessor {
 
       command
         .toFormat('mp3')
-        .on('end', () => resolve(outputPath))
-        .on('error', (err) => reject(new Error("FFmpeg Error: " + err.message)))
+        .audioCodec('libmp3lame')
+        .on('end', () => {
+          if (!fs.existsSync(outputPath)) {
+            return reject(new Error('Output audio gagal dibuat'));
+          }
+          const stat = fs.statSync(outputPath);
+          if (stat.size === 0) {
+            return reject(new Error('Output audio kosong'));
+          }
+          resolve(outputPath);
+        })
+        .on('error', (err) => reject(new Error("FFmpeg Processing Error: " + err.message)))
         .save(outputPath);
     });
   }
