@@ -149,6 +149,12 @@ app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
   }
 });
 
+// Endpoint Antrean Worker Redfinger
+app.get('/api/fetch-worker/claim', (req, res) => {
+  if (pendingJobs.length === 0) return res.json({ job: null });
+  res.json({ job: pendingJobs.shift() });
+});
+
 app.post('/api/audio/fetch', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ success: false, error: 'URL required' });
@@ -174,11 +180,6 @@ app.post('/api/audio/fetch', async (req, res) => {
       return res.status(504).json({ success: false, error: 'Worker timeout.' });
     }
   }, 500);
-});
-
-app.post('/api/fetch-worker/claim', (req, res) => {
-  if (pendingJobs.length === 0) return res.json({ job: null });
-  res.json({ job: pendingJobs.shift() });
 });
 
 const uploadWorker = multer({ dest: 'uploads/', limits: { fileSize: 50 * 1024 * 1024 } });
