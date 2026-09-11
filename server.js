@@ -24,12 +24,28 @@ function getDB() {
 }
 function saveDB(data) { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)); }
 
+// Endpoint Konek Akun Roblox yang benar dan menyimpan ke db.json
 app.post('/api/account/connect', (req, res) => {
   const { userId, apiKey } = req.body;
-  if (!userId || !apiKey) return res.status(400).json({ success: false, error: 'Required' });
-  const accountData = { connected: true, userId, username: `RobloxDev_${userId}`, avatarUrl: 'https://tr.rbxcdn.com/30day-AvatarHeadshot/150/150/AvatarHeadshot/Png', apiKey };
-  let db = getDB(); db.account = accountData; saveDB(db);
+  if (!userId || !apiKey) {
+    return res.status(400).json({ success: false, error: 'User ID dan API Key wajib diisi!' });
+  }
+  const accountData = { 
+    connected: true, 
+    userId, 
+    username: `RobloxDev_${userId}`, 
+    avatarUrl: 'https://tr.rbxcdn.com/30day-AvatarHeadshot/150/150/AvatarHeadshot/Png', 
+    apiKey 
+  };
+  let db = getDB(); 
+  db.account = accountData; 
+  saveDB(db);
   res.json({ success: true, account: accountData });
+});
+
+app.get('/api/account/status', (req, res) => {
+  let db = getDB();
+  res.json({ success: true, account: db.account });
 });
 
 app.get('/api/limits', (req, res) => {
@@ -43,7 +59,7 @@ const audioProcessor = require('./services/audioProcessor');
 let pendingJobs = [];
 const activeJobs = new Map();
 
-// Endpoint Proses Bypass (Mendukung File Upload Lokal ATAU fetchedUrl dari worker)
+// Endpoint Proses Bypass
 app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
   try {
     let inputFilePath = '';
@@ -53,13 +69,12 @@ app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
     if (req.file) {
       inputFilePath = req.file.path;
     } else if (fetchedUrl) {
-      // Ambil file dari direktori uploads server berdasarkan path fetchedUrl
       const cleanedPath = fetchedUrl.replace('/uploads/', '');
       inputFilePath = path.join(uploadsDir, cleanedPath);
     }
 
     if (!inputFilePath || !fs.existsSync(inputFilePath)) {
-      return res.status(400).json({ success: false, error: 'Silahkan fetch link YouTube/TikTok atau pilih file audio lokal terlebih dahulu!' });
+      return res.status(400).json({ success: false, error: 'Silahkan fetch link YouTube/TikTok atau pilih file audio lokal!' });
     }
 
     const outputPath = path.join(uploadsDir, `bypassed-${Date.now()}.mp3`);
@@ -75,6 +90,7 @@ app.post('/api/audio/process', upload.single('audio'), async (req, res) => {
   }
 });
 
+// Endpoint Fetch (Dipercepat pengecekannya setiap 500ms agar tidak terasa lama)
 app.post('/api/audio/fetch', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ success: false, error: 'URL required' });
@@ -84,7 +100,7 @@ app.post('/api/audio/fetch', async (req, res) => {
   
   pendingJobs.push({ id: jobId, token: jobToken, url, status: 'pending' });
 
-  const timeout = 300000;
+  const timeout = 300000; // 5 menit
   const start = Date.now();
 
   const checkInterval = setInterval(() => {
@@ -98,9 +114,9 @@ app.post('/api/audio/fetch', async (req, res) => {
     if (Date.now() - start > timeout) {
       clearInterval(checkInterval);
       pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-      return res.status(504).json({ success: false, error: 'Worker timeout: Proses download melebihi batas waktu.' });
+      return res.status(504).json({ success: false, error: 'Worker timeout: Proses download terlalu lama.' });
     }
-  }, 1000);
+  }, 500); // Cek setiap 0.5 detik agar responsif
 });
 
 app.post('/api/fetch-worker/claim', (req, res) => {
