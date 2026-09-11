@@ -1,3 +1,33 @@
+#!/bin/bash
+
+# 1. Buat nixpacks.toml agar Railway otomatis menginstal Node.js, Python, & ffmpeg
+cat << 'EOF' > nixpacks.toml
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "python3", "ffmpeg", "yt-dlp"]
+EOF
+
+# 2. Perbarui package.json
+cat << 'EOF' > package.json
+{
+  "name": "mchlern-bypas-audio",
+  "version": "2.0.0",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.7.0",
+    "uuid": "^9.0.1",
+    "youtube-dl-exec": "^3.1.12"
+  }
+}
+EOF
+
+# 3. Update server.js dengan penanganan cookies yang aman
+cat << 'EOF' > server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -136,3 +166,18 @@ app.post('/api/roblox/upload', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
+EOF
+
+# 4. Pastikan .gitignore TIDAK mengabaikan youtube_cookies.txt agar ter-upload ke git
+cat << 'EOF' > .gitignore
+node_modules
+.env
+storage/db.json
+uploads/
+EOF
+
+# 5. Push ke GitHub
+git add .
+git commit -m "Add nixpacks config for python/ffmpeg support and youtube cookies"
+git push -u origin main --force
+echo "=== SELESAI DAN DIPUSH KE GITHUB ==="
