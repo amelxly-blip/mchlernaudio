@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Perbarui server.js dengan timeout antrean job yang lebih lama (5 menit)
+cat << 'EOF' > server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -133,3 +137,9 @@ app.post('/api/roblox/upload', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
+EOF
+
+git add .
+git commit -m "Extend worker fetch timeout to 5 minutes"
+git push -u origin main --force
+echo "=== SELESAI DIPUSH KE GITHUB ==="

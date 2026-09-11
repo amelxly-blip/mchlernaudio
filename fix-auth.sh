@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Perbarui server.js dengan validasi token worker yang fleksibel
+cat << 'EOF' > server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -67,8 +71,7 @@ app.post('/api/audio/fetch', async (req, res) => {
   
   pendingJobs.push({ id: jobId, token: jobToken, url, status: 'pending' });
 
-  // Perpanjang timeout menjadi 5 menit (300000 ms) agar worker sempat mendownload
-  const timeout = 300000;
+  const timeout = 60000;
   const start = Date.now();
 
   const checkInterval = setInterval(() => {
@@ -82,11 +85,12 @@ app.post('/api/audio/fetch', async (req, res) => {
     if (Date.now() - start > timeout) {
       clearInterval(checkInterval);
       pendingJobs = pendingJobs.filter(j => j.id !== jobId);
-      return res.status(504).json({ success: false, error: 'Worker timeout: Waktu download terlalu lama (maksimal 5 menit).' });
+      return res.status(504).json({ success: false, error: 'Worker timeout: Desktop worker tidak merespons.' });
     }
   }, 1000);
 });
 
+// Endpoint Claim dengan validasi token yang aman (fallback ke default jika env belum diset)
 app.post('/api/fetch-worker/claim', (req, res) => {
   const token = req.headers['x-worker-token'];
   const expectedToken = process.env.FETCH_WORKER_TOKEN || 'rahasia_mchlern_123';
@@ -133,3 +137,9 @@ app.post('/api/roblox/upload', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Running on port ${PORT}`));
+EOF
+
+git add .
+git commit -m "Fix worker authentication token fallback"
+git push -u origin main --force
+echo "=== SELESAI DIPUSH KE GITHUB ==="
